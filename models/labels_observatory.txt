@@ -1,0 +1,5 @@
+0 rain
+1 dirt
+2 clear_day
+3 clear_night
+4 cloud
