@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataset Cropper with Sidebar</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        /* LEFT SIDEBAR */
+        #sidebar {
+            width: 300px;
+            min-width: 300px;
+            max-width: 300px;
+            background-color: #1a1a1a;
+            border-right: 2px solid #2d2d2d;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            flex-shrink: 0;
+            box-sizing: border-box;
+            z-index: 20;
+        }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #2d2d2d;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: #161616;
+        }
+        .sidebar-header h3 { margin: 0; color: #fff; font-size: 15px; }
+        
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .control-panel-row {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            background: #222;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            box-sizing: border-box;
+        }
+        .panel-row-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 600;
+            color: #bbb;
+        }
+        
+        /* TOGGLE SWITCH STYLING */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-switch {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #4b5563;
+            transition: .3s;
+            border-radius: 24px;
+        }
+        .slider-switch:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        input:checked + .slider-switch { background-color: #2563eb; }
+        input:checked + .slider-switch:before { transform: translateX(20px); }
+        
+        /* SLIDER COMPONENT STYLING */
+        .zoom-slider {
+            width: 100%;
+            margin: 8px 0 4px 0;
+            accent-color: #2563eb;
+            cursor: pointer;
+        }
+        .zoom-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #888;
+            font-family: monospace;
+            padding: 0 2px;
+        }
+
+        /* AUTO BATCH BUTTON STYLING */
+        .btn-batch {
+            background-color: #10b981 !important;
+            color: white;
+            font-weight: bold;
+            border: 1px solid #059669;
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+        }
+        .btn-batch:hover { background-color: #059669 !important; }
+
+        .file-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .file-item {
+            padding: 10px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: normal;
+            word-break: break-all;
+            color: #cccccc;
+            line-height: 1.4;
+            transition: background 0.15s, color 0.15s;
+            border: 1px solid transparent;
+            box-sizing: border-box;
+        }
+        
+        .file-item:nth-child(odd) { background-color: #222222; }
+        .file-item:nth-child(even) { background-color: #1e1e1e; }
+        
+        .file-item:hover {
+            background-color: #333333;
+            color: #fff;
+            border-color: #444;
+        }
+        .file-item.active {
+            background-color: #2563eb !important;
+            color: #fff !important;
+            font-weight: bold;
+            border-color: #3b82f6;
+        }
+        
+        .file-item.done-status {
+            color: #00ffcc !important;
+            background-color: rgba(0, 255, 204, 0.05) !important;
+            border-color: rgba(0, 255, 204, 0.2);
+        }
+        .file-item.done-status::after { content: " ✓"; font-weight: bold; float: right; }
+
+        .file-item.skipped-status {
+            color: #777777 !important;
+            background-color: rgba(255, 255, 255, 0.02) !important;
+            text-decoration: line-through;
+        }
+        .file-item.skipped-status::after { content: " ✕"; font-weight: normal; float: right; }
+
+        /* Style for automatically deleted tiny images */
+        .file-item.deleted-status {
+            color: #ef4444 !important;
+            background-color: rgba(239, 68, 68, 0.05) !important;
+            border-color: rgba(239, 68, 68, 0.2);
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+        .file-item.deleted-status::after { content: " ✕ [SMALL]"; font-weight: bold; float: right; }
+
+        /* LOADING MESSAGE */
+        .loading-badge {
+            background-color: #1e293b;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            color: #38bdf8;
+            font-size: 13px;
+            text-align: center;
+            border: 1px solid #0284c7;
+            display: none;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
+        /* CENTER WORKSPACE */
+        #main-content {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            background-color: #0b0b0b;
+            height: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        
+        #workspace {
+            position: relative;
+            display: inline-block;
+            border: 3px solid #ff5500; 
+            background-color: #555555;
+            background-image: linear-gradient(45deg, #2a2a2a 25%, transparent 25%), 
+                              linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #2a2a2a 75%), 
+                              linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
+            background-size: 24px 24px;
+            background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+            max-width: 100%;
+            max-height: 100%;
+            overflow: hidden;
+            cursor: none;
+            box-sizing: border-box;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+        }
+        #sourceImage {
+            display: block;
+            max-width: 100%;
+            max-height: 85vh;
+            width: auto;
+            height: auto;
+            user-select: none;
+            -webkit-user-drag: none;
+            transform-origin: center center;
+        }
+
+        /* 224x224 Reticle */
+        #cropReticle {
+            position: absolute;
+            width: 224px;
+            height: 224px;
+            border: 2px dashed #00ffcc;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7); 
+            pointer-events: none;
+            display: none;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+        #cropReticle::before {
+            content: "TARGET FRAME (224x224)";
+            position: absolute;
+            top: -24px;
+            left: -2px;
+            background: #00ffcc;
+            color: #000;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 3px 3px 0 0;
+            white-space: nowrap;
+        }
+
+        /* FAR RIGHT DOCUMENTATION PANEL */
+        #help-panel {
+            width: 320px;
+            min-width: 320px;
+            max-width: 320px;
+            background-color: #161616;
+            border-left: 2px solid #2d2d2d;
+            height: 100%;
+            padding: 24px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        #help-panel h3 { margin: 0; color: #fff; font-size: 16px; border-bottom: 1px solid #333; padding-bottom: 8px;}
+        #help-panel h4 { margin: 15px 0 5px 0; color: #00ffcc; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;}
+        .help-section { font-size: 13px; line-height: 1.5; color: #b3b3b3; }
+        
+        .shortcut-list { display: flex; flex-direction: column; gap: 10px; margin-top: 5px; }
+        .shortcut-item {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            background: #1e1e1e;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #2a2a2a;
+        }
+        .key-badge {
+            background-color: #374151;
+            color: #ffffff;
+            font-family: monospace;
+            font-weight: bold;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-right: 12px;
+            border-bottom: 2px solid #212529;
+            white-space: nowrap;
+            min-width: 85px;
+            text-align: center;
+        }
+
+        .version-label {
+            margin-top: auto;
+            padding-top: 15px;
+            border-top: 1px solid #262626;
+            font-size: 11px;
+            font-family: monospace;
+            color: #555;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .btn {
+            background-color: #2563eb;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: background 0.2s;
+            text-align: center;
+            flex: 1;
+        }
+        .btn:hover { background-color: #1d4ed8; }
+        .btn-alt { background-color: #374151; }
+        .btn-alt:hover { background-color: #4b5563; }
+        #fileInputHidden { display: none; }
+        
+        .stats { 
+            font-size: 11px; 
+            color: #aaa; 
+            background: #262626; 
+            padding: 8px 10px; 
+            border-radius: 4px;
+            word-break: break-all;
+            line-height: 1.4;
+            border: 1px solid #333;
+        }
+        
+        .dashboard-container { display: flex; flex-direction: column; gap: 6px; }
+        .counter-badge {
+            background-color: #2d2d2d;
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #00ffcc;
+            font-family: monospace;
+            font-size: 12px;
+            text-align: center;
+            border: 1px solid #3d3d3d;
+        }
+        .progress-badge { background-color: #22252a; color: #38bdf8; border-color: #2e353f; }
+
+        #cropCanvas { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <h3>Dataset Directory</h3>
+            <div class="btn-group">
+                <button class="btn" id="folderBtn">Select Folder</button>
+                <button class="btn btn-alt" id="fileBtn">Select File</button>
+            </div>
+            <button class="btn btn-batch" id="batchBtn">⚡ Run Auto-Batch Crop</button>
+            <input type="file" id="fileInputHidden" accept="image/*">
+            
+            <div class="control-panel-row">
+                <div class="panel-row-header">
+                    <span>Auto-Advance on Click</span>
+                    <label class="switch">
+                        <input type="checkbox" id="autoAdvanceToggle">
+                        <span class="slider-switch"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-panel-row">
+                <div class="panel-row-header">
+                    <span>Pre-Zoom to Crop Box Size</span>
+                    <label class="switch">
+                        <input type="checkbox" id="preZoomFocusToggle">
+                        <span class="slider-switch"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-panel-row">
+                <div class="panel-row-header">
+                    <span>Zoom Speed Multiplier</span>
+                    <span id="zoomFactorDisplay" style="color:#2563eb; font-family:monospace; font-weight:bold;">1x</span>
+                </div>
+                <input type="range" id="zoomStepSlider" class="zoom-slider" min="0" max="2" step="1" value="0">
+                <div class="zoom-labels">
+                    <span>1x Smooth</span>
+                    <span>2x Medium</span>
+                    <span>4x Fast</span>
+                </div>
+            </div>
+            
+            <div class="loading-badge" id="loadingDisplay">⏳ Reading folder, please wait...</div>
+            
+            <div class="dashboard-container" id="dashboardContainer">
+                <div class="counter-badge" id="counterDisplay">Crops Saved: 0</div>
+                <div class="counter-badge progress-badge" id="progressDisplay">Progress: 0 / 0 (0%)</div>
+            </div>
+            
+            <div class="stats" id="statsDisplay">Ready to load files</div>
+        </div>
+        <div class="file-list" id="fileListContainer"></div>
+    </div>
+
+    <div id="main-content">
+        <div id="workspace">
+            <img id="sourceImage" alt="">
+            <div id="cropReticle"></div>
+        </div>
+    </div>
+
+    <div id="help-panel">
+        <div>
+            <h3>Interactive Guide</h3>
+            <div class="help-section">
+                This utility formats your custom image datasets to the exact 224x224 square layout required natively by Teachable Machine.
+            </div>
+        </div>
+
+        <div>
+            <h4>Interface Controls</h4>
+            <div class="shortcut-list">
+                <div class="shortcut-item">
+                    <span class="key-badge">⚠️ Resolution Guard</span>
+                    <span>Any loaded image smaller than 224x224 is automatically rejected, deleted from queue, and skipped.</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key-badge">⚡ Auto-Batch</span>
+                    <span>Click the green button to instantly center-crop and resize the entire folder at macro speeds!</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key-badge">Left Click</span>
+                    <span>Crop manually selected region and save. Behavior shifts based on toggles.</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key-badge">Right Click</span>
+                    <span>Finalize current file and advance queue manually. Marks Green ✓ or Gray ✕.</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key-badge">Scroll Wheel</span>
+                    <span>Zooms smoothly. Minimum scale lock active to prevent out of bound crops.</span>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h4>Pro Tips</h4>
+            <div class="help-section" style="font-size: 12px;">
+                • **Resolution Gatekeeper:** Images that do not meet the base dimensional limit ($< 224\text{px}$) will turn <span style="color:#ef4444;">Red ✕</span> in the sidebar list.<br><br>
+                • Disable your browser's download prompt via: <b>Settings -> Downloads -> Turn off "Ask where to save each file"</b>.
+            </div>
+        </div>
+
+        <div class="version-label">
+            <span>System Mode: Dataset Prep</span>
+            <span>v2.1.0</span>
+        </div>
+    </div>
+
+    <canvas id="cropCanvas" width="224" height="224"></canvas>
+
+    <script>
+        const folderBtn = document.getElementById('folderBtn');
+        const fileBtn = document.getElementById('fileBtn');
+        const batchBtn = document.getElementById('batchBtn');
+        const fileInputHidden = document.getElementById('fileInputHidden');
+        const fileListContainer = document.getElementById('fileListContainer');
+        const workspace = document.getElementById('workspace');
+        const sourceImage = document.getElementById('sourceImage');
+        const cropReticle = document.getElementById('cropReticle');
+        const cropCanvas = document.getElementById('cropCanvas');
+        const statsDisplay = document.getElementById('statsDisplay');
+        const counterDisplay = document.getElementById('counterDisplay');
+        const progressDisplay = document.getElementById('progressDisplay');
+        const dashboardContainer = document.getElementById('dashboardContainer');
+        const loadingDisplay = document.getElementById('loadingDisplay');
+        const autoAdvanceToggle = document.getElementById('autoAdvanceToggle');
+        const preZoomFocusToggle = document.getElementById('preZoomFocusToggle');
+        const zoomStepSlider = document.getElementById('zoomStepSlider');
+        const zoomFactorDisplay = document.getElementById('zoomFactorDisplay');
+        const ctx = cropCanvas.getContext('2d');
+
+        let imageFiles = []; 
+        let currentIndex = -1;
+        let currentMouseX = 0;
+        let currentMouseY = 0;
+        
+        let currentZoom = 1.0;
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let startPanX = 0;
+        let startPanY = 0;
+
+        let savedFileCount = 0;
+        
+        const croppedFilesIndex = new Set(); 
+        const skippedFilesIndex = new Set();
+        const deletedFilesIndex = new Set(); // Tracks images too small for the engine requirements
+        let currentImageWasCropped = false;
+        let isBatchProcessing = false;
+
+        const zoomStepValues = [1.0, 2.0, 4.0];
+
+        zoomStepSlider.addEventListener('input', () => {
+            const factor = zoomStepValues[zoomStepSlider.value];
+            zoomFactorDisplay.textContent = factor + 'x';
+        });
+
+        folderBtn.addEventListener('click', async () => {
+            try {
+                const dirHandle = await window.showDirectoryPicker();
+                
+                resetApp();
+                imageFiles = [];
+                dashboardContainer.style.display = "none";
+                loadingDisplay.style.display = "block";
+                statsDisplay.textContent = "Processing file system index handles...";
+                
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                const imageRegex = /\.(png|jpg|jpeg|webp|bmp)$/i;
+
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file') {
+                        if (imageRegex.test(entry.name)) {
+                            imageFiles.push({
+                                name: entry.name,
+                                getFile: async () => await entry.getFile()
+                            });
+                        }
+                    }
+                }
+
+                imageFiles.sort((a, b) => a.name.localeCompare(b.name));
+                
+                loadingDisplay.style.display = "none";
+                dashboardContainer.style.display = "flex";
+                
+                buildSidebarUI();
+
+            } catch (err) {
+                loadingDisplay.style.display = "none";
+                dashboardContainer.style.display = "flex";
+                console.error("Folder reading closed:", err);
+            }
+        });
+
+        fileBtn.addEventListener('click', () => {
+            fileInputHidden.click();
+        });
+
+        fileInputHidden.addEventListener('change', (e) => {
+            if (e.target.files.length === 0) return;
+            const file = e.target.files[0];
+            
+            imageFiles = [];
+            resetApp();
+
+            imageFiles.push({
+                name: file.name,
+                getFile: async () => file
+            });
+
+            buildSidebarUI();
+        });
+
+        // ⚡ RUN AUTOMATED MACRO BATCH CRUNCH ENGINE
+        batchBtn.addEventListener('click', async () => {
+            if (imageFiles.length === 0 || isBatchProcessing) return;
+            
+            isBatchProcessing = true;
+            batchBtn.disabled = true;
+            batchBtn.textContent = "⏳ Running Macro Batch...";
+            
+            let startIdx = currentIndex >= 0 ? currentIndex : 0;
+            
+            for (let i = startIdx; i < imageFiles.length; i++) {
+                selectImage(i);
+                
+                await new Promise(resolve => {
+                    const checkLoaded = () => {
+                        if (sourceImage.complete && sourceImage.naturalWidth > 0) {
+                            resolve();
+                        } else {
+                            setTimeout(checkLoaded, 20);
+                        }
+                    };
+                    checkLoaded();
+                });
+
+                // NEW GUARDRAIL: Automatically drop, skip, and tag if raw size < 224 pixels
+                if (sourceImage.naturalWidth < 224 || sourceImage.naturalHeight < 224) {
+                    markAsDeleted();
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                    continue; 
+                }
+
+                const minZoomX = 224 / sourceImage.clientWidth;
+                const minZoomY = 224 / sourceImage.clientHeight;
+                const macroTargetZoom = Math.max(minZoomX, minZoomY);
+                
+                const scaleX = sourceImage.naturalWidth / sourceImage.clientWidth;
+                const scaleY = sourceImage.naturalHeight / sourceImage.clientHeight;
+
+                const sourceWidth = 224 * (scaleX / macroTargetZoom);
+                const sourceHeight = 224 * (scaleY / macroTargetZoom);
+                
+                const sourceX = (sourceImage.naturalWidth - sourceWidth) / 2;
+                const sourceY = (sourceImage.naturalHeight - sourceHeight) / 2;
+
+                ctx.clearRect(0, 0, 224, 224);
+                ctx.fillStyle = "#FFFFFF";
+                ctx.fillRect(0, 0, 224, 224);
+                
+                ctx.drawImage(
+                    sourceImage,
+                    sourceX, sourceY, sourceWidth, sourceHeight,
+                    0, 0, 224, 224
+                );
+
+                const serialString = String(savedFileCount).padStart(5, '0');
+                
+                const link = document.createElement('a');
+                link.download = `image_${serialString}.jpg`;
+                link.href = cropCanvas.toDataURL('image/jpeg', 0.9);
+                link.click();
+
+                currentImageWasCropped = true;
+                savedFileCount++;
+                
+                advanceQueue();
+                await new Promise(resolve => setTimeout(resolve, 80));
+            }
+            
+            isBatchProcessing = false;
+            batchBtn.disabled = false;
+            batchBtn.textContent = "⚡ Run Auto-Batch Crop";
+        });
+
+        function resetApp() {
+            croppedFilesIndex.clear();
+            skippedFilesIndex.clear();
+            deletedFilesIndex.clear();
+            savedFileCount = 0;
+            fileListContainer.innerHTML = '';
+            currentIndex = -1;
+            currentImageWasCropped = false;
+            isBatchProcessing = false;
+            batchBtn.disabled = false;
+            batchBtn.textContent = "⚡ Run Auto-Batch Crop";
+        }
+
+        function buildSidebarUI() {
+            updateDashboardUI();
+
+            imageFiles.forEach((fileObj, idx) => {
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.textContent = fileObj.name;
+                div.id = `file-item-${idx}`;
+                div.addEventListener('click', () => {
+                    if (!isBatchProcessing) selectImage(idx);
+                });
+                fileListContainer.appendChild(div);
+            });
+
+            if (imageFiles.length > 0) {
+                selectImage(0);
+            }
+        }
+
+        async function selectImage(index) {
+            if (index < 0 || index >= imageFiles.length) return;
+            
+            if (currentIndex !== -1) {
+                const prevItem = document.getElementById(`file-item-${currentIndex}`);
+                if (prevItem) prevItem.classList.remove('active');
+            }
+
+            currentIndex = index;
+            currentImageWasCropped = false; 
+            
+            const activeItem = document.getElementById(`file-item-${currentIndex}`);
+            if (activeItem) {
+                activeItem.classList.add('active');
+                activeItem.scrollIntoView({ block: 'nearest' });
+            }
+
+            statsDisplay.textContent = `Active (${currentIndex + 1}/${imageFiles.length}): ${imageFiles[currentIndex].name}`;
+
+            const fileObj = imageFiles[currentIndex];
+            const file = await fileObj.getFile();
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                sourceImage.src = e.target.result;
+                
+                currentZoom = 1.0;
+                panX = 0;
+                panY = 0;
+                applyTransformations();
+                
+                sourceImage.onload = function() {
+                    // MANUAL INTERFACE TRIGGER: Instantly dump file if it violates base resolutions
+                    if (sourceImage.naturalWidth < 224 || sourceImage.naturalHeight < 224) {
+                        if (!isBatchProcessing) {
+                            markAsDeleted();
+                            return; 
+                        }
+                    }
+
+                    setTimeout(() => {
+                        const minZoomX = 224 / sourceImage.clientWidth;
+                        const minZoomY = 224 / sourceImage.clientHeight;
+                        const absoluteMinZoom = Math.max(minZoomX, minZoomY);
+                        
+                        if (preZoomFocusToggle.checked) {
+                            currentZoom = absoluteMinZoom;
+                        } else {
+                            if (currentZoom < absoluteMinZoom) {
+                                currentZoom = absoluteMinZoom;
+                            }
+                        }
+                        
+                        panX = 0;
+                        panY = 0;
+                        
+                        applyTransformations();
+                        cropReticle.style.display = "block";
+                    }, 30);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function applyTransformations() {
+            sourceImage.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+        }
+
+        function updateDashboardUI() {
+            counterDisplay.textContent = `Crops Saved: ${savedFileCount}`;
+            
+            const total = imageFiles.length;
+            const processedCount = croppedFilesIndex.size + skippedFilesIndex.size + deletedFilesIndex.size;
+            const percentage = total > 0 ? Math.round((processedCount / total) * 100) : 0;
+            
+            progressDisplay.textContent = `Progress: ${processedCount} / ${total} (${percentage}%)`;
+        }
+
+        // NEW METHOD: Process layout switches if target files don't meet dimensions
+        function markAsDeleted() {
+            deletedFilesIndex.add(currentIndex);
+            croppedFilesIndex.delete(currentIndex);
+            skippedFilesIndex.delete(currentIndex);
+
+            const listItem = document.getElementById(`file-item-${currentIndex}`);
+            if (listItem) {
+                listItem.className = 'file-item deleted-status';
+            }
+
+            updateDashboardUI();
+            stepForwardNextInQueue();
+        }
+
+        function stepForwardNextInQueue() {
+            if (currentIndex + 1 < imageFiles.length) {
+                selectImage(currentIndex + 1);
+            } else {
+                cropReticle.style.display = "none";
+                sourceImage.src = "";
+                statsDisplay.textContent = "🎉 Processing Complete!";
+                if (isBatchProcessing) {
+                    isBatchProcessing = false;
+                    batchBtn.disabled = false;
+                    batchBtn.textContent = "⚡ Run Auto-Batch Crop";
+                }
+            }
+        }
+
+        function advanceQueue() {
+            const listItem = document.getElementById(`file-item-${currentIndex}`);
+            
+            if (currentImageWasCropped) {
+                croppedFilesIndex.add(currentIndex);
+                skippedFilesIndex.delete(currentIndex);
+                if (listItem) {
+                    listItem.classList.remove('skipped-status');
+                    listItem.classList.add('done-status');
+                }
+            } else {
+                skippedFilesIndex.add(currentIndex);
+                croppedFilesIndex.delete(currentIndex);
+                if (listItem) {
+                    listItem.classList.remove('done-status');
+                    listItem.classList.add('skipped-status');
+                }
+            }
+
+            updateDashboardUI();
+            stepForwardNextInQueue();
+        }
+
+        workspace.addEventListener('mousemove', (e) => {
+            if (isBatchProcessing) return; 
+            const rect = workspace.getBoundingClientRect();
+            
+            if (isPanning) {
+                panX = e.clientX - startPanX;
+                panY = e.clientY - startPanY;
+                applyTransformations();
+            } else {
+                let x = e.clientX - rect.left - 112;
+                let y = e.clientY - rect.top - 112;
+                
+                const imgRect = sourceImage.getBoundingClientRect();
+                
+                const imgLeftInWorkspace = imgRect.left - rect.left;
+                const imgTopInWorkspace = imgRect.top - rect.top;
+                const imgRightInWorkspace = imgLeftInWorkspace + imgRect.width;
+                const imgBottomInWorkspace = imgTopInWorkspace + imgRect.height;
+
+                if (x < 0) x = 0;
+                if (y < 0) y = 0;
+                if (x + 224 > rect.width) x = rect.width - 224;
+                if (y + 224 > rect.height) y = rect.height - 224;
+
+                if (x < imgLeftInWorkspace) x = imgLeftInWorkspace;
+                if (y < imgTopInWorkspace) y = imgTopInWorkspace;
+                if (x + 224 > imgRightInWorkspace) x = imgRightInWorkspace - 224;
+                if (y + 224 > imgBottomInWorkspace) y = imgBottomInWorkspace - 224;
+                
+                cropReticle.style.left = `${x}px`;
+                cropReticle.style.top = `${y}px`;
+                
+                currentMouseX = x;
+                currentMouseY = y;
+            }
+        });
+
+        workspace.addEventListener('wheel', (e) => {
+            if (isBatchProcessing) return;
+            e.preventDefault();
+            
+            const baseIncrement = 0.05;
+            const calculatedStep = baseIncrement * zoomStepValues[zoomStepSlider.value];
+            
+            const minZoomX = 224 / sourceImage.clientWidth;
+            const minZoomY = 224 / sourceImage.clientHeight;
+            const absoluteMinZoom = Math.max(minZoomX, minZoomY);
+
+            if (e.deltaY < 0) {
+                currentZoom += calculatedStep;
+            } else {
+                currentZoom -= calculatedStep;
+            }
+            
+            currentZoom = Math.max(absoluteMinZoom, Math.min(16.0, currentZoom));
+            applyTransformations();
+        }, { passive: false });
+
+        workspace.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+
+        workspace.addEventListener('mousedown', (e) => {
+            if (imageFiles.length === 0 || currentIndex === -1 || isBatchProcessing) return;
+
+            if (e.button === 1) {
+                e.preventDefault();
+                isPanning = true;
+                startPanX = e.clientX - panX;
+                startPanY = e.clientY - panY;
+                cropReticle.style.display = "none"; 
+                return;
+            }
+
+            if (e.button === 2) {
+                e.preventDefault();
+                advanceQueue();
+                return;
+            }
+
+            if (e.button === 0) {
+                // FALLBACK EXTRACTION LOCKOUT: Stop crops if raw assets don't pass parameters
+                if (sourceImage.naturalWidth < 224 || sourceImage.naturalHeight < 224) {
+                    markAsDeleted();
+                    return;
+                }
+
+                const rect = workspace.getBoundingClientRect();
+                const imgRect = sourceImage.getBoundingClientRect();
+
+                const scaleX = sourceImage.naturalWidth / imgRect.width;
+                const scaleY = sourceImage.naturalHeight / imgRect.height;
+
+                const cropTargetLeftInWorkspace = currentMouseX;
+                const cropTargetTopInWorkspace = currentMouseY;
+
+                let sourceX = (rect.left + cropTargetLeftInWorkspace - imgRect.left) * scaleX;
+                let sourceY = (rect.top + cropTargetTopInWorkspace - imgRect.top) * scaleY;
+                
+                let sourceWidth = 224 * scaleX;
+                let sourceHeight = 224 * scaleY;
+
+                if (sourceX < 0) sourceX = 0;
+                if (sourceY < 0) sourceY = 0;
+                if (sourceX + sourceWidth > sourceImage.naturalWidth) {
+                    sourceX = sourceImage.naturalWidth - sourceWidth;
+                }
+                if (sourceY + sourceHeight > sourceImage.naturalHeight) {
+                    sourceY = sourceImage.naturalHeight - sourceHeight;
+                }
+
+                ctx.clearRect(0, 0, 224, 224);
+                ctx.fillStyle = "#FFFFFF";
+                ctx.fillRect(0, 0, 224, 224);
+                
+                ctx.drawImage(
+                    sourceImage,
+                    sourceX, sourceY, sourceWidth, sourceHeight,
+                    0, 0, 224, 224
+                );
+
+                const serialString = String(savedFileCount).padStart(5, '0');
+                
+                const link = document.createElement('a');
+                link.download = `image_${serialString}.jpg`;
+                link.href = cropCanvas.toDataURL('image/jpeg', 0.9);
+                link.click();
+
+                currentImageWasCropped = true; 
+                savedFileCount++;
+                updateDashboardUI();
+
+                if (autoAdvanceToggle.checked) {
+                    advanceQueue();
+                }
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === 1 && isPanning) {
+                isPanning = false;
+                cropReticle.style.display = "block"; 
+            }
+        });
+    </script>
+</body>
+</html>
