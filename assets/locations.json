@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "locations": [
+    {
+      "id": "74320b12",
+      "location": "Perugia",
+      "latitude": 43.155849,
+      "longitude": 12.404035,
+      "camera_azimuth": 30.0,
+      "camera_altitude": 90.0
+    },
+    {
+      "id": "cfd83422",
+      "location": "Roma",
+      "latitude": 41.780143,
+      "longitude": 12.526866,
+      "camera_azimuth": 280.0,
+      "camera_altitude": 90.0
+    }
+  ]
+}
